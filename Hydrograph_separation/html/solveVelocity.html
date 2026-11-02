@@ -1,0 +1,575 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>solveVelocity</title><meta name="generator" content="MATLAB 8.3"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2015-10-01"><meta name="DC.source" content="solveVelocity.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; } 
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style></head><body><div class="content"><h2>Contents</h2><div><ul><li><a href="#3">initialize the basic data and computs the concentrate times</a></li><li><a href="#4">calculate hillslope and channel distance</a></li><li><a href="#5">import flood events extracted from USGS data</a></li><li><a href="#6">compute the 1st order precpitation moment</a></li><li><a href="#8">instantenous runoff, Q(t)</a></li><li><a href="#9">$$ R_{t}(x,y)=</a></li><li><a href="#10">calculate the moments</a></li><li><a href="#11">mass center of the Runoff</a></li><li><a href="#13">$$ E&lt;T_C&gt; $</a></li></ul></div><pre class="codeinput"><span class="keyword">function</span> solveVelocity
+</pre><pre class="codeinput">curFile = mfilename(<span class="string">'fullpath'</span>);
+[curDir,~,~]=fileparts(curFile);
+[progDir,~,~]=fileparts(curDir);
+addpath([progDir,<span class="string">'/Numeric'</span>]);
+GDALLoad();
+dirBasic=<span class="string">'G:\simulation\US_Basins\Kankakee_River\basic\'</span>;
+dirRain=<span class="string">'G:\simulation\US_Basins\Kankakee_River\rains_hourly\'</span>;
+fileSite=<span class="string">'G:\simulation\US_Basins\Kankakee_River\obs\05527500.shp'</span>;
+strDEM=[dirBasic,<span class="string">'dem.tif'</span>];
+strFDR=[dirBasic,<span class="string">'fdr.tif'</span>];
+strStream=[dirBasic,<span class="string">'stream.tif'</span>];
+xlsEvent=<span class="string">'G:\simulation\US_Basins\Kankakee_River\result\Event_Timing.xlsx'</span>;
+xlsHydrograph=<span class="string">'G:\simulation\US_Basins\Kankakee_River\05527500_1h.xlsx'</span>;
+<span class="comment">% dt=datenum(2001,1,1,1,0,0)-datenum(2001,1,1,0,0,0);</span>
+noDataVal=-9999;
+<span class="comment">% strFAC=[dorBasoc,'fac.tif'];</span>
+</pre><h2>initialize the basic data and computs the concentrate times<a name="3"></a></h2><pre class="codeinput">[FDR,geoTrans,proj]=ReadRaster(strFDR);
+stream=ReadRaster(strStream);
+stream(isnan(stream))=0;
+stream=logical(stream);
+basinMask=~isnan(FDR);
+DEM=ReadRaster(strDEM);
+GM=1.364364;
+[xOut1,yOut1,wktStr]=readShapeLoc(fileSite,0);
+[xOut2,yOut2]=ProjTransform(wktStr,proj,xOut1,yOut1);
+[rowOut,colOut]=Proj2RowCol(geoTrans, yOut2,xOut2);
+isGCS=IsGeographic(proj,geoTrans);
+[slope,nextLen]=CalSlope(rowOut,colOut,basinMask,DEM,FDR,GM,geoTrans,proj);
+[~,gridArea]=RasterArea(DEM,geoTrans,isGCS);
+</pre><h2>calculate hillslope and channel distance<a name="4"></a></h2><p>$$ L_h(x,y) and L_n(x,y) $</p><pre class="codeinput">[hDist,nDist]=CalDist(basinMask,rowOut,colOut,FDR,slope,nextLen,stream);
+</pre><pre class="codeoutput">cells left: 1
+cells left: 3
+cells left: 7
+cells left: 7
+cells left: 11
+cells left: 11
+cells left: 9
+cells left: 11
+cells left: 15
+cells left: 18
+cells left: 18
+cells left: 23
+cells left: 21
+cells left: 22
+cells left: 21
+cells left: 21
+cells left: 24
+cells left: 24
+cells left: 28
+cells left: 24
+cells left: 31
+cells left: 34
+cells left: 33
+cells left: 35
+cells left: 36
+cells left: 46
+cells left: 42
+cells left: 43
+cells left: 47
+cells left: 48
+cells left: 39
+cells left: 48
+cells left: 51
+cells left: 49
+cells left: 53
+cells left: 51
+cells left: 51
+cells left: 40
+cells left: 45
+cells left: 34
+cells left: 40
+cells left: 38
+cells left: 30
+cells left: 38
+cells left: 36
+cells left: 43
+cells left: 44
+cells left: 40
+cells left: 45
+cells left: 43
+cells left: 53
+cells left: 52
+cells left: 49
+cells left: 45
+cells left: 56
+cells left: 51
+cells left: 55
+cells left: 47
+cells left: 51
+cells left: 44
+cells left: 44
+cells left: 57
+cells left: 63
+cells left: 79
+cells left: 77
+cells left: 95
+cells left: 103
+cells left: 97
+cells left: 80
+cells left: 80
+cells left: 89
+cells left: 91
+cells left: 96
+cells left: 97
+cells left: 112
+cells left: 108
+cells left: 102
+cells left: 130
+cells left: 118
+cells left: 125
+cells left: 106
+cells left: 97
+cells left: 104
+cells left: 91
+cells left: 116
+cells left: 102
+cells left: 98
+cells left: 116
+cells left: 104
+cells left: 85
+cells left: 96
+cells left: 114
+cells left: 87
+cells left: 102
+cells left: 92
+cells left: 97
+cells left: 81
+cells left: 90
+cells left: 93
+cells left: 98
+cells left: 103
+cells left: 92
+cells left: 97
+cells left: 116
+cells left: 119
+cells left: 117
+cells left: 123
+cells left: 138
+cells left: 140
+cells left: 144
+cells left: 143
+cells left: 130
+cells left: 134
+cells left: 137
+cells left: 134
+cells left: 141
+cells left: 125
+cells left: 128
+cells left: 99
+cells left: 93
+cells left: 88
+cells left: 89
+cells left: 81
+cells left: 67
+cells left: 59
+cells left: 62
+cells left: 66
+cells left: 66
+cells left: 76
+cells left: 72
+cells left: 83
+cells left: 73
+cells left: 76
+cells left: 90
+cells left: 87
+cells left: 85
+cells left: 79
+cells left: 88
+cells left: 79
+cells left: 90
+cells left: 85
+cells left: 73
+cells left: 68
+cells left: 60
+cells left: 58
+cells left: 58
+cells left: 76
+cells left: 76
+cells left: 72
+cells left: 68
+cells left: 69
+cells left: 64
+cells left: 68
+cells left: 71
+cells left: 74
+cells left: 69
+cells left: 60
+cells left: 64
+cells left: 64
+cells left: 66
+cells left: 55
+cells left: 51
+cells left: 58
+cells left: 47
+cells left: 50
+cells left: 56
+cells left: 52
+cells left: 50
+cells left: 64
+cells left: 70
+cells left: 82
+cells left: 95
+cells left: 94
+cells left: 90
+cells left: 76
+cells left: 68
+cells left: 66
+cells left: 55
+cells left: 30
+cells left: 24
+cells left: 26
+cells left: 24
+cells left: 27
+cells left: 32
+cells left: 35
+cells left: 41
+cells left: 22
+cells left: 18
+cells left: 20
+cells left: 19
+cells left: 14
+cells left: 16
+cells left: 20
+cells left: 28
+cells left: 35
+cells left: 34
+cells left: 32
+cells left: 30
+cells left: 33
+cells left: 36
+cells left: 47
+cells left: 49
+cells left: 44
+cells left: 37
+cells left: 20
+cells left: 14
+cells left: 8
+cells left: 4
+cells left: 2
+</pre><h2>import flood events extracted from USGS data<a name="5"></a></h2><pre class="codeinput">data=xlsread(xlsEvent);
+nEvents=size(data,1);
+rainBeginNum=data(:,1);
+rainEndNum=data(:,2);
+runoffBeginNum=data(:,3);
+runoffEndNum=data(:,4);
+<span class="comment">% runoff dates of the event</span>
+<span class="keyword">if</span> ~isscalar(gridArea)
+    A=sum(gridArea(basinMask));
+<span class="keyword">else</span>
+    A=sum(sum(basinMask))*gridArea;
+<span class="keyword">end</span>
+mcTime=zeros(nEvents,1);
+<span class="comment">% vcTime=zeros(nEvents,1);</span>
+simP1h=zeros(nEvents,1);
+simP1n=zeros(nEvents,1);
+<span class="comment">% maxFlow=zeros(nEvents,1);</span>
+</pre><h2>compute the 1st order precpitation moment<a name="6"></a></h2><pre class="codeinput"><span class="keyword">for</span> ie=1:nEvents
+</pre><pre class="codeinput">    rain=nan(size(basinMask,1),size(basinMask,2));
+    datesRainRegion=[<span class="string">'A'</span> num2str(rainBeginNum(ie)) <span class="string">':A'</span> num2str(rainEndNum(ie))];
+    datesDischargeRegion=[<span class="string">'A'</span> num2str(runoffBeginNum(ie)) <span class="string">':A'</span> num2str(runoffEndNum(ie))];
+    runoffRegion=[<span class="string">'M'</span> num2str(runoffBeginNum(ie)) <span class="string">':M'</span> num2str(runoffEndNum(ie))];
+    <span class="comment">% rain dates of the event</span>
+    [~,datesRTxt]=xlsread(xlsHydrograph,1,datesDischargeRegion);
+    datesR=datenum(datesRTxt,<span class="string">'yyyy/mm/dd:HH'</span>);
+</pre><pre class="codeoutput error">Error using xlsread (line 247)
+Undefined function or variable "workbook".
+
+Error in solveVelocity (line 69)
+    [~,datesRainTxt]=xlsread(xlsHydrograph,1,datesRainRegion);
+</pre><h2>instantenous runoff, Q(t)<a name="8"></a></h2><pre class="codeinput">    R=xlsread(xlsHydrograph,1,runoffRegion);
+    <span class="keyword">if</span> max(R)&lt;350
+        disp([<span class="string">'event '</span> num2str(ie) <span class="string">' maximal flow is smaller than the threshold, skip...'</span>])
+        <span class="keyword">continue</span>;
+    <span class="keyword">end</span>
+
+    [~,datesRainTxt]=xlsread(xlsHydrograph,1,datesRainRegion);
+    datesRain=datenum(datesRainTxt,<span class="string">'yyyy/mm/dd:HH'</span>);
+    R(R==noDataVal)=NaN;
+    R=impaintNaN(R);
+    Dt=datesR(1:end)-datesRain(1);
+    mcR=sum(Dt.*R)./sum(R);
+    <span class="keyword">if</span> mcR&gt;19
+        disp([<span class="string">'event '</span> num2str(ie) <span class="string">' not flash enough, skip...'</span>])
+        <span class="keyword">continue</span>;
+    <span class="keyword">end</span>
+    mcTime(ie)=mcR;
+    P1h=0;
+    P1n=0;
+    P0=0;
+    P2=0;
+    ETr=0;
+</pre><h2>$$ R_{t}(x,y)=<a name="9"></a></h2><h2>calculate the moments<a name="10"></a></h2><pre class="codeinput">    <span class="keyword">for</span> i=1:length(datesRain)
+</pre><h2>mass center of the Runoff<a name="11"></a></h2><pre class="codeinput">        fileRain=[dirRain,<span class="string">'rain.'</span>, datestr(datesRain(i)-datenum(0,0,0,1,0,0)/2,<span class="string">'yyyymmddHHMM'</span>),<span class="string">'.mat'</span>];
+        S=load(fileRain);
+        hasValue=~isnan(S.srain);
+        rain(hasValue)=S.srain(hasValue);
+        clear <span class="string">S</span>
+        <span class="comment">% first ordered moments of rain</span>
+        <span class="comment">% 1000 converts mm-&gt;m</span>
+        <span class="keyword">if</span> isscalar(gridArea)
+            ETr=ETr+sum(rain(basinMask)/1000*(datesRain(i)-datesRain(1)))*gridArea/A;
+            P1h=P1h+sum(rain(basinMask)/1000.*hDist(basinMask))*gridArea/A;
+            P1n=P1n+sum(rain(basinMask)/1000.*nDist(basinMask))*gridArea/A;
+<span class="comment">%             P2=P2+sum(rain(basinMask))/1000.*dist2Outlet(basinMask).^2*gridArea/A;</span>
+            P0=P0+sum(rain(basinMask)/1000*gridArea)/A;
+        <span class="keyword">else</span>
+            ETr=ETr+sum(rain(basinMask)/1000*(datesRain(i)-datesRain(1))).*gridArea/A;
+            P1h=P1h+sum(rain(basinMask)/1000.*hDist(basinMask).*gridArea(basinMask))/A;
+            P1n=P1n+sum(rain(basinMask)/1000.*nDist(basinMask).*gridArea(basinMask))/A;
+<span class="comment">%             P2=P2+sum(rain(basinMask))/1000.*dist2Outlet(basinMask).^2.*gridArea/A;</span>
+            P0=P0+sum(rain(basinMask)/1000.*gridArea(basinMask))/A;
+        <span class="keyword">end</span>
+</pre><pre class="codeinput">    <span class="keyword">end</span>
+</pre><h2>$$ E&lt;T_C&gt; $<a name="13"></a></h2><pre class="codeinput">    ETr=ETr/P0;
+    simP1h(ie)=P1h/P0;
+    simP1n(ie)=P1n/P0;
+    mcTime(ie)=mcTime(ie)-ETr;
+    disp([<span class="string">'event '</span> num2str(ie), <span class="string">' finished'</span>]);
+</pre><pre class="codeinput"><span class="keyword">end</span>
+mask=simP1h&gt;0 &amp; ~isnan(mcTime);
+A=[simP1h(mask),simP1n(mask)];
+[x,errA,errb]=TLS(A,mcTime(mask),0);
+plot(A*x,mcTime(mask),<span class="string">'.'</span>);
+</pre><pre class="codeoutput">Error using internal.matlab.publish.PublishFigures&gt;printSnap (line 266)
+Could not write to C:\Dropbox\code\MFiles\Hydrograph_separation\html\solveVelocity_01.png.
+FILEATTRIB output is
+
+  archive:1
+  system:0
+  hidden:0
+  directory:0
+  UserRead:1
+  UserWrite:1
+  UserExecute:1
+  GroupRead:NaN
+  GroupWrite:NaN
+  GroupExecute:NaN
+  OtherRead:NaN
+  OtherWrite:NaN
+  OtherExecute:NaN
+
+Error in internal.matlab.publish.PublishFigures.snapFigure (line 148)
+                    feval([method 'Snap'],f,imgFilename,imageFormat,opts);
+
+Error in internal.matlab.publish.PublishFigures/snap (line 67)
+                imgFilename = obj.snapFigure(f,obj.options.filenameGenerator(),obj.options);
+
+Error in internal.matlab.publish.PublishFigures/leavingCell (line 92)
+                imgFilename = snap(obj, f);
+
+Error in snapnow&gt;leavingCell (line 197)
+            newFiles = data.plugins(iPlugins).instance.leavingCell(iCell);
+
+Error in snapnow (line 133)
+                        data = leavingCell(iCell(k), data, doCapture(k));
+
+Error in solveVelocity (line 63)
+    R=xlsread(xlsHydrograph,1,runoffRegion);
+
+Error in evalmxdom&gt;instrumentAndRun (line 90)
+text = evalc(evalstr);
+
+Error in evalmxdom (line 21)
+[data,text,laste] = instrumentAndRun(file,cellBoundaries,imageDir,imagePrefix,options);
+
+Error in publish (line 164)
+    dom = evalmxdom(file,dom,cellBoundaries,prefix,imageDir,outputDir,options);
+
+Error in mdbpublish (line 55)
+outputPath = publish(file, options);
+
+Caused by:
+    Error using restoreui (line 21)
+    Need a handle to a Figure object.
+
+Operation terminated by user during comeventcallback
+
+ 
+Warning: Error occurred while evaluating listener callback. 
+</pre><pre class="codeinput"><span class="keyword">end</span>
+</pre><p class="footer"><br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2014a</a><br></p></div><!--
+##### SOURCE BEGIN #####
+function solveVelocity
+curFile = mfilename('fullpath');
+[curDir,~,~]=fileparts(curFile);
+[progDir,~,~]=fileparts(curDir);
+addpath([progDir,'/Numeric']);
+GDALLoad();
+dirBasic='G:\simulation\US_Basins\Kankakee_River\basic\';
+dirRain='G:\simulation\US_Basins\Kankakee_River\rains_hourly\';
+fileSite='G:\simulation\US_Basins\Kankakee_River\obs\05527500.shp';
+strDEM=[dirBasic,'dem.tif'];
+strFDR=[dirBasic,'fdr.tif'];
+strStream=[dirBasic,'stream.tif'];
+xlsEvent='G:\simulation\US_Basins\Kankakee_River\result\Event_Timing.xlsx';
+xlsHydrograph='G:\simulation\US_Basins\Kankakee_River\05527500_1h.xlsx';
+% dt=datenum(2001,1,1,1,0,0)-datenum(2001,1,1,0,0,0);
+noDataVal=-9999;
+% strFAC=[dorBasoc,'fac.tif'];
+%% initialize the basic data and computs the concentrate times
+[FDR,geoTrans,proj]=ReadRaster(strFDR);
+stream=ReadRaster(strStream);
+stream(isnan(stream))=0;
+stream=logical(stream);
+basinMask=~isnan(FDR);
+DEM=ReadRaster(strDEM);
+GM=1.364364;
+[xOut1,yOut1,wktStr]=readShapeLoc(fileSite,0);
+[xOut2,yOut2]=ProjTransform(wktStr,proj,xOut1,yOut1);
+[rowOut,colOut]=Proj2RowCol(geoTrans, yOut2,xOut2);
+isGCS=IsGeographic(proj,geoTrans);
+[slope,nextLen]=CalSlope(rowOut,colOut,basinMask,DEM,FDR,GM,geoTrans,proj);
+[~,gridArea]=RasterArea(DEM,geoTrans,isGCS);
+%% calculate hillslope and channel distance
+% $$ L_h(x,y) and L_n(x,y) $
+[hDist,nDist]=CalDist(basinMask,rowOut,colOut,FDR,slope,nextLen,stream);
+%% import flood events extracted from USGS data
+data=xlsread(xlsEvent);
+nEvents=size(data,1);
+rainBeginNum=data(:,1);
+rainEndNum=data(:,2);
+runoffBeginNum=data(:,3);
+runoffEndNum=data(:,4);
+% runoff dates of the event
+if ~isscalar(gridArea)
+    A=sum(gridArea(basinMask));
+else
+    A=sum(sum(basinMask))*gridArea;
+end
+mcTime=zeros(nEvents,1);
+% vcTime=zeros(nEvents,1);
+simP1h=zeros(nEvents,1);
+simP1n=zeros(nEvents,1);
+% maxFlow=zeros(nEvents,1);
+%% compute the 1st order precpitation moment
+for ie=1:nEvents
+    rain=nan(size(basinMask,1),size(basinMask,2));
+    datesRainRegion=['A' num2str(rainBeginNum(ie)) ':A' num2str(rainEndNum(ie))];
+    datesDischargeRegion=['A' num2str(runoffBeginNum(ie)) ':A' num2str(runoffEndNum(ie))];
+    runoffRegion=['M' num2str(runoffBeginNum(ie)) ':M' num2str(runoffEndNum(ie))];
+    % rain dates of the event
+    [~,datesRTxt]=xlsread(xlsHydrograph,1,datesDischargeRegion);
+    datesR=datenum(datesRTxt,'yyyy/mm/dd:HH');
+   %% instantenous runoff, Q(t)
+    R=xlsread(xlsHydrograph,1,runoffRegion);
+    if max(R)<350
+        disp(['event ' num2str(ie) ' maximal flow is smaller than the threshold, skip...'])
+        continue;
+    end
+    
+    [~,datesRainTxt]=xlsread(xlsHydrograph,1,datesRainRegion);
+    datesRain=datenum(datesRainTxt,'yyyy/mm/dd:HH');
+    R(R==noDataVal)=NaN;
+    R=impaintNaN(R);
+    Dt=datesR(1:end)-datesRain(1);
+    mcR=sum(Dt.*R)./sum(R);
+    if mcR>19
+        disp(['event ' num2str(ie) ' not flash enough, skip...'])
+        continue;
+    end
+    mcTime(ie)=mcR;
+    P1h=0;
+    P1n=0;
+    P0=0;
+    P2=0;
+    ETr=0;
+    
+    %% $$ R_{t}(x,y)=
+     %% calculate the moments
+    for i=1:length(datesRain)
+       %% mass center of the Runoff
+        fileRain=[dirRain,'rain.', datestr(datesRain(i)-datenum(0,0,0,1,0,0)/2,'yyyymmddHHMM'),'.mat'];
+        S=load(fileRain);
+        hasValue=~isnan(S.srain);
+        rain(hasValue)=S.srain(hasValue);
+        clear S
+        % first ordered moments of rain
+        % 1000 converts mm->m
+        if isscalar(gridArea)
+            ETr=ETr+sum(rain(basinMask)/1000*(datesRain(i)-datesRain(1)))*gridArea/A;
+            P1h=P1h+sum(rain(basinMask)/1000.*hDist(basinMask))*gridArea/A;
+            P1n=P1n+sum(rain(basinMask)/1000.*nDist(basinMask))*gridArea/A;
+%             P2=P2+sum(rain(basinMask))/1000.*dist2Outlet(basinMask).^2*gridArea/A;
+            P0=P0+sum(rain(basinMask)/1000*gridArea)/A;
+        else
+            ETr=ETr+sum(rain(basinMask)/1000*(datesRain(i)-datesRain(1))).*gridArea/A;
+            P1h=P1h+sum(rain(basinMask)/1000.*hDist(basinMask).*gridArea(basinMask))/A;
+            P1n=P1n+sum(rain(basinMask)/1000.*nDist(basinMask).*gridArea(basinMask))/A;
+%             P2=P2+sum(rain(basinMask))/1000.*dist2Outlet(basinMask).^2.*gridArea/A;
+            P0=P0+sum(rain(basinMask)/1000.*gridArea(basinMask))/A;
+        end
+    end
+    %% $$ E<T_C> $
+    ETr=ETr/P0;
+    simP1h(ie)=P1h/P0;
+    simP1n(ie)=P1n/P0;
+    mcTime(ie)=mcTime(ie)-ETr;
+    disp(['event ' num2str(ie), ' finished']);
+end
+mask=simP1h>0 & ~isnan(mcTime);
+A=[simP1h(mask),simP1n(mask)];
+[x,errA,errb]=TLS(A,mcTime(mask),0);
+plot(A*x,mcTime(mask),'.');
+end
+##### SOURCE END #####
+--></body></html>
