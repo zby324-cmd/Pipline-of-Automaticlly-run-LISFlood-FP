@@ -1,0 +1,17 @@
+function elevDist(this,allBetween,fileDEM,blockSize)
+%% This function computes the horizontal distance between the current node and its parent.
+% The path2parent field has to be filled before calling this function
+%% input parameters
+% allBetweeh: true|false: output results bewteen each pixel (including the
+% current node and the parent| only compute the results between the current
+% node and its parent
+% geoTrans: The 6-GT coefficient defining the CS
+% isGeographic: if the projection is in length|lat,lon
+%%
+if allBetweem
+    rows=this.Path2Parent(:,1);
+    cols=this.Path2Parent(:,2);
+else
+    
+end
+end

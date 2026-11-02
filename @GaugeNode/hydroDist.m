@@ -1,0 +1,29 @@
+function hydroDist(this,allBetween,geoTrans,isGeographic)
+%% This function computes the horizontal distance between the current node and its parent.
+% The path2parent field has to be filled before calling this function
+%% input parameters
+% allBetweeh: true|false: output results bewteen each pixel (including the
+% current node and the parent| only compute the results between the current
+% node and its parent
+% geoTrans: The 6-GT coefficient defining the CS
+% isGeographic: if the projection is in length|lat,lon
+%%
+if isempty(this.parent)
+    disp('skip root');
+    return;
+end
+if allBetween
+    if ~isempty(this.Path2Parent)
+        [Y,X]=RowCol2Proj(geoTrans,[this.row;this.Path2Parent(:,1);this.Parent.row],[this.col;this.Path2Parent(:,2);this.Parent.col]);
+    else
+        [Y,X]=RowCol2Proj(geoTrans,[this.row;this.Parent.row],[this.col;this.Parent.col]);
+    end
+else
+    error('not implemented')
+end
+if isGeographic
+    this.hDist=distance(Y(1:end-1),X(1:end-1),Y(2:end),X(2:end));
+else
+    this.hDist=sqrt((Y(1:end-1)-Y(2:end)).^2+(X(1:end-1)-X(2:end)).^2);
+end
+end
